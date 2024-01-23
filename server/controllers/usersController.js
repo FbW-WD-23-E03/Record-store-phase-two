@@ -1,94 +1,45 @@
-import multer from "multer";
-import sharp from "sharp";
-import createError from "http-errors";
-
 import User from "../models/userModel.js";
+import Cart from "../models/cartModel.js";
 import successHandler from "../middlewares/successHandler.js";
-import { isValidId } from "../middlewares/errorHandlers.js";
 
-//* --------------------- Multer & sharp configurations -----------------------
-const multerStorage = multer.memoryStorage();
+export const signup = async (req, res, next) => {
+  try {
+    const user = await User.create(req.body);
+    const newCart = await Cart.create({});
 
-const multerFilter = (req, file, cb) => {
-  file.mimetype.startsWith("image")
-    ? cb(null, true)
-    : cb(createError(400, "The uploaded file is not an image"), false);
-};
+    user.cartId = newCart._id;
+    await user.save();
 
-const upload = multer({
-  storage: multerStorage,
-  fileFilter: multerFilter,
-});
-
-export const processUserAvatar = (req, res, next) => {
-  if (req.file) {
-    req.file.fileName = `user_${req.user.id}-${Date.now()}.jpeg`;
-
-    sharp(req.file.buffer)
-      .resize(500, 500)
-      .toFormat("jpeg")
-      .jpeg({ quality: 80 })
-      .toFile(`uploads/${req.file.fileName}`);
+    successHandler(res, 201, user);
+  } catch (error) {
+    next(error);
   }
-  next();
 };
 
-export const uploadUserAvatar = upload.single("avatar");
-//* -------------------------------------------------------------------------
+export const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      throw new Error("Please provide email and password");
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      throw new Error("Incorrect email or password");
+    }
+
+    successHandler(res, 202, user);
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const getAllUsers = async (req, res, next) => {
   try {
-    const users = await User.find();
+    const users = await User.find().populate("cartId");
     successHandler(res, 200, users);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getUserById = async (req, res, next) => {
-  try {
-    isValidId(req);
-    const user = await User.findById(req.params.id);
-    successHandler(res, 200, user);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const deleteAllUsers = async (req, res, next) => {
-  try {
-    const deleteConfirm = await User.deleteMany();
-    successHandler(res, 200, deleteConfirm);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const updateUserById = async (req, res, next) => {
-  try {
-    isValidId(req);
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-
-    if (req.file) {
-      user.avatar = req.file.filename;
-      user.passwordConfirm = req.user.password;
-    }
-
-    await user.save();
-
-    successHandler(res, 200, user);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const deleteUserById = async (req, res, next) => {
-  try {
-    isValidId(req);
-    const user = await User.findByIdAndDelete(req.params.id);
-    successHandler(res, 200, user);
   } catch (error) {
     next(error);
   }
